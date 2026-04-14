@@ -3,308 +3,721 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Фрактальный Вьювер</title>
+    <title>Fractal Oracle</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
-        body { background: #050505; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
-        canvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
+        body { background: #050505; overflow: hidden; font-family: 'Segoe UI', Roboto, sans-serif; color: #fff; }
         
-        .ui-panel {
-            position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
-            display: flex; gap: 10px; padding: 10px 14px;
-            background: rgba(20, 20, 30, 0.6); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-            border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px;
-            align-items: center; z-index: 10; flex-wrap: wrap; justify-content: center;
-        }
-        .ui-select {
-            background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15);
-            color: #e0e0e0; padding: 6px 28px 6px 12px; border-radius: 8px; font-size: 13px;
-            cursor: pointer; outline: none; appearance: none;
-            background-image: url("image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23fff' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
-            background-repeat: no-repeat; background-position: right 10px center;
-        }
-        .ui-select:hover { background-color: rgba(255, 255, 255, 0.18); }
-        .ui-select option { background: #14141e; color: #fff; }
+        canvas { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: move; }
+        #glCanvas { z-index: 1; }
+        #attractorCanvas { display: none; position: absolute; top: 0; left: 0; z-index: 2; }
 
-        .hud {
-            position: absolute; bottom: 14px; left: 14px; right: 14px;
-            display: flex; justify-content: space-between; padding: 8px 12px;
-            background: rgba(10, 10, 18, 0.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px;
-            font-size: 12px; color: rgba(255, 255, 255, 0.65); font-variant-numeric: tabular-nums;
-            z-index: 10; pointer-events: none; line-height: 1.5;
+        .sound-toggle {
+            position: absolute; top: 20px; right: 20px; z-index: 100;
+            background: rgba(20, 20, 30, 0.6); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 50%;
+            width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 20px; color: #fff; transition: 0.3s;
         }
-        .hud .val { color: #a0c8ff; font-weight: 500; }
-        .hud div { margin: 0 4px; }
+        .sound-toggle:hover { background: rgba(40, 40, 60, 0.8); transform: scale(1.1); }
+        .sound-toggle.muted { opacity: 0.5; }
+
+        .panel-container {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            background: rgba(10, 10, 15, 0.85); backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px 20px 0 0;
+            z-index: 50; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transform: translateY(calc(100% - 60px));
+        }
+        .panel-container.open { transform: translateY(0); }
+
+        .panel-handle {
+            width: 100%; height: 60px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            position: relative;
+        }
+        .panel-arrow { font-size: 24px; color: rgba(255,255,255,0.5); transition: 0.3s; }
+        .panel-container.open .panel-arrow { transform: rotate(180deg); }
+
+        .panel-content {
+            padding: 0 20px 30px 20px; display: flex; flex-direction: column; gap: 15px;
+            max-height: 70vh; overflow-y: auto;
+        }
+
+        .mode-switch {
+            display: flex; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 4px;
+        }
+        .mode-btn {            flex: 1; padding: 8px; text-align: center; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 600; color: #aaa; transition: 0.2s;
+        }
+        .mode-btn.active { background: rgba(100, 150, 255, 0.3); color: #fff; }
+
+        .controls-row { display: flex; gap: 10px; }
+        .control-group { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        
+        select, input {
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);
+            color: #fff; padding: 10px; border-radius: 8px; font-size: 14px; outline: none;
+        }
+        select { appearance: none; background-image: url("image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23fff' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+        
+        .seed-input-group { display: flex; gap: 8px; }
+        .seed-input-group input { flex: 1; }
+        .seed-btn {
+            padding: 0 12px; border-radius: 8px; background: rgba(255,255,255,0.1);
+            border: none; color: #fff; cursor: pointer; font-size: 16px; display: flex; align-items: center;
+        }
+        .seed-btn:hover { background: rgba(255,255,255,0.2); }
+
+        .actions { display: flex; gap: 10px; margin-top: 10px; }
+        .btn-main {
+            flex: 2; padding: 14px; background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            border: none; border-radius: 12px; color: #fff; font-size: 16px; font-weight: bold;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(37, 117, 252, 0.4); transition: 0.2s;
+        }
+        .btn-main:active { transform: scale(0.98); }
+        .btn-sec {
+            flex: 1; padding: 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px; color: #fff; font-size: 14px; cursor: pointer; transition: 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .btn-sec:hover { background: rgba(255,255,255,0.2); }
 
         #errorBox {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(200, 50, 50, 0.9); color: white; padding: 20px; border-radius: 12px;
-            font-family: monospace; font-size: 13px; max-width: 90%; text-align: left;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5); z-index: 100; display: none;
+            background: rgba(180, 20, 20, 0.9); color: white; padding: 24px; border-radius: 16px;
+            font-family: monospace; font-size: 14px; max-width: 90%; text-align: left;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8); z-index: 200; display: none;
+            border: 1px solid rgba(255,100,100,0.5);
         }
-        #errorBox pre { margin: 10px 0 0 0; white-space: pre-wrap; font-size: 11px; opacity: 0.9; }
+        #errorBox h3 { margin-bottom: 10px; font-size: 18px; }
+        #errorBox pre { white-space: pre-wrap; font-size: 12px; opacity: 0.9; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; }
+        #errorBox button { margin-top: 15px; padding: 8px 16px; background: white; color: #b00; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
 
         @media (max-width: 600px) {
-            .ui-panel { top: 10px; padding: 8px 10px; gap: 8px; width: 94%; }
-            .ui-select { padding: 5px 22px 5px 10px; font-size: 12px; }            .hud { font-size: 10px; flex-wrap: wrap; justify-content: center; text-align: center; gap: 6px; }
+            .controls-row { flex-direction: column; gap: 12px; }            .panel-content { padding-bottom: 40px; }
         }
     </style>
 </head>
 <body>
-    <canvas id="gl"></canvas>
-    <div id="errorBox"></div>
-    
-    <div class="ui-panel">
-        <select id="selType" class="ui-select" onchange="setType(this.value)">
-            <option value="0">Mandelbrot</option>
-            <option value="1">Julia Set</option>
-            <option value="2">Tricorn</option>
-            <option value="3">Burning Ship</option>
-            <option value="4">Multibrot (n=3)</option>
-            <option value="5">Celtic</option>
-        </select>
-        <select id="selPal" class="ui-select" onchange="setPalette(this.value)">
-            <option value="0">Чёрно-белая</option>
-            <option value="1">Радужная</option>
-            <option value="2">Психоделия</option>
-            <option value="3">Doom</option>
-        </select>
+
+    <canvas id="glCanvas"></canvas>
+    <canvas id="attractorCanvas"></canvas>
+
+    <div class="sound-toggle muted" id="btnSound" onclick="toggleSound()">🔇</div>
+
+    <div id="errorBox">
+        <h3>⚠️ Ошибка Оракула</h3>
+        <pre id="errorText"></pre>
+        <button onclick="document.getElementById('errorBox').style.display='none'">Закрыть</button>
     </div>
 
-    <div class="hud">
-        <div>Фрактал: <span class="val" id="hType">Mandelbrot</span> | Палитра: <span class="val" id="hPal">Радужная</span></div>
-        <div>Коорд: <span class="val" id="hCoord">0.0000, 0.0000</span> | Зум: <span class="val" id="hZoom">×1.00</span></div>
-        <div>FPS: <span class="val" id="hFPS">0</span> | Iter: <span class="val" id="hIter">150</span></div>
+    <div class="panel-container" id="panel">
+        <div class="panel-handle" onclick="togglePanel()">
+            <div class="panel-arrow">^</div>
+        </div>
+        <div class="panel-content">
+            
+            <div class="mode-switch">
+                <div class="mode-btn active" id="modeClassic" onclick="setMode('classic')">✨ Классика</div>
+                <div class="mode-btn" id="modeChaos" onclick="setMode('chaos')">🌪 Хаос</div>
+            </div>
+
+            <div class="controls-row">
+                <div class="control-group">
+                    <label>Фрактал</label>
+                    <select id="selectType"></select>
+                </div>
+                <div class="control-group">
+                    <label>Палитра</label>
+                    <select id="selectPalette">
+                        <option value="0">🌈 Радужная</option>
+                        <option value="1">⚫ Чёрно-белая</option>
+                        <option value="2">🌀 Психоделия</option>
+                        <option value="3">🔥 Инферно</option>
+                        <option value="4">❔ Пустота</option>
+                        <option value="5">🌃 Neon Tokyo</option>
+                        <option value="6">🧬 ДНК</option>
+                        <option value="7">🌅 Восход</option>
+                        <option value="8">🚫 Doom</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="control-group">                <label>Сид (Seed)</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+                    <button class="mode-btn active" style="font-size: 12px; padding: 4px;" id="inputDate" onclick="setInputMode('date')">📅 Дата</button>
+                    <button class="mode-btn" style="font-size: 12px; padding: 4px;" id="inputNum" onclick="setInputMode('num')">🔢 Число</button>
+                    <button class="mode-btn" style="font-size: 12px; padding: 4px;" id="inputText" onclick="setInputMode('text')">💬 Текст</button>
+                </div>
+                <div class="seed-input-group">
+                    <input type="text" id="seedInput" placeholder="Введите сид..." oninput="updateSeedFromInput()">
+                    <button class="seed-btn" id="btnNow" onclick="setDateSeed()" title="Вставить текущее время">🕒</button>
+                    <button class="seed-btn" id="btnRandom" onclick="setRandomSeed()" title="Случайное число" style="display:none;">🎲</button>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn-main" onclick="generate()">🔮 ГЕНЕРИРОВАТЬ</button>
+                <button class="btn-sec" onclick="savePNG()">📸 PNG</button>
+            </div>
+
+        </div>
     </div>
 
     <script>
-        const state = { type: 0, palette: 1, cx: 0, cy: 0, zoom: 1.0, maxIter: 150 };
-        const names = ["Mandelbrot", "Julia Set", "Tricorn", "Burning Ship", "Multibrot (n=3)", "Celtic"];
-        const palNames = ["Чёрно-белая", "Радужная", "Психоделия", "Doom"];
-        
-        try { const s = localStorage.getItem('fractal_v5'); if (s) Object.assign(state, JSON.parse(s)); } catch (e) {}
-        const saveState = () => { try { localStorage.setItem('fractal_v5', JSON.stringify(state)); } catch(e){} };
+        const FRACTALS_CLASSIC = [
+            { id: 'mandelbrot', name: 'Mandelbrot Set' },
+            { id: 'julia', name: 'Julia Set' },
+            { id: 'burning', name: 'Burning Ship' },
+            { id: 'multibrot', name: 'Multibrot (n=3)' },
+            { id: 'tricorn', name: 'Tricorn' },
+            { id: 'celtic', name: 'Celtic' }
+        ];
+        const FRACTALS_CHAOS = [
+            { id: 'clifford', name: 'Clifford Attractor' },
+            { id: 'dejong', name: 'De Jong Attractor' },
+            { id: 'hopalong', name: 'Hopalong Attractor' },
+            { id: 'pickover', name: 'Pickover Attractor' }
+        ];
 
-        const selType = document.getElementById('selType');
-        const selPal = document.getElementById('selPal');
-        selType.value = state.type; selPal.value = state.palette;
+        let state = {
+            mode: 'classic',
+            type: 'mandelbrot',
+            palette: 0,
+            inputMode: 'date',
+            seedValue: Date.now().toString(),
+            soundEnabled: false
+        };
 
-        const canvas = document.getElementById('gl');
-        const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: true });
-        if (!gl) { showError('WebGL2 не поддерживается.'); throw 'No WebGL2'; }
+        const glCanvas = document.getElementById('glCanvas');
+        const attrCanvas = document.getElementById('attractorCanvas');
+        const ctxAttr = attrCanvas.getContext('2d');
+        const selectType = document.getElementById('selectType');        const seedInput = document.getElementById('seedInput');
+        const errorBox = document.getElementById('errorBox');
+        const errorText = document.getElementById('errorText');
 
-        function showError(msg) {
-            const box = document.getElementById('errorBox');
-            box.style.display = 'block';            box.innerHTML = `<strong>⚠️ Ошибка:</strong><br><pre>${msg}</pre>`;
-            console.error(msg);
+        let gl = null;
+        let prog = null;
+        let uniformLocs = null;
+        let viewZoom = 1.0;
+        let viewCenter = [0, 0];
+        let isDragging = false;
+        let lastMouse = [0, 0];
+        let audioCtx = null;
+        let currentSeedParams = { cx: 0, cy: 0 };
+
+        function init() {
+            resize();
+            window.addEventListener('resize', resize);
+            updateTypeList();
+            seedInput.value = state.seedValue;
+            document.getElementById('panel').classList.add('open');
+            setupInputHandlers();
         }
-
-        const vs = `#version 300 es
-        layout(location = 0) in vec2 a_pos;
-        void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
-
-        const fs = `#version 300 es
-        precision highp float;
-        uniform vec2 u_res;
-        uniform float u_time, u_zoom, u_maxIter;
-        uniform vec2 u_center;
-        uniform int u_type, u_palette;
-        out vec4 fragColor;
-
-        struct DFloat { float h; float l; };
-        
-        DFloat dfF(float x) { return DFloat(x, 0.0); }
-        
-        DFloat dfAdd(DFloat a, DFloat b) {
-            float s = a.h + b.h;
-            float v = s - a.h;
-            float e = (a.h - (s - v)) + (b.h - v) + a.l + b.l;
-            return DFloat(s, e);
-        }
-        
-        DFloat dfSub(DFloat a, DFloat b) {
-            float s = a.h - b.h;
-            float v = s - a.h;
-            float e = (a.h - (s + v)) + (b.h + v) + a.l - b.l;
-            return DFloat(s, e);
-        }
-        
-        DFloat dfMul(DFloat a, DFloat b) {
-            float p = a.h * b.h;
-            float e = a.h * b.l + a.l * b.h;
-            return DFloat(p, e);
-        }
-        
-        DFloat dfMulF(DFloat a, float f) { return DFloat(a.h * f, a.l * f); }
-        
-        float dfLenSq(DFloat r, DFloat i) { return r.h * r.h + i.h * i.h; }
-
-        float renderFractal(vec2 uv) {
-            float scale = 1.0 / u_zoom;
-            DFloat cr = dfAdd(dfF(uv.x * scale), dfF(u_center.x));
-            DFloat ci = dfAdd(dfF(uv.y * scale), dfF(u_center.y));
-
-            DFloat zr, zi;            if (u_type == 1) { zr = cr; zi = ci; }
-            else { zr = dfF(0.0); zi = dfF(0.0); }
-            
-            if (u_type == 1) { cr = dfF(-0.7269); ci = dfF(0.1889); }
-
-            float iter = 0.0;
-            for (int i = 0; i < 800; i++) {
-                if (i >= int(u_maxIter)) break;
-                if (dfLenSq(zr, zi) > 4.0) break;
-
-                DFloat tr = zr, ti = zi;
-                if (u_type == 5) tr.h = abs(tr.h);
-                if (u_type == 3) { tr.h = abs(tr.h); ti.h = abs(ti.h); }
-
-                DFloat r2 = dfMul(tr, tr);
-                DFloat i2 = dfMul(ti, ti);
-                DFloat ri = dfMul(tr, ti);
-
-                DFloat nr, ni;
-                if (u_type == 4) {
-                    DFloat zr2 = r2, zi2 = i2;
-                    DFloat zr3 = dfMul(zr2, zr);
-                    DFloat zi3 = dfMul(zi2, zi);
-                    nr = dfSub(zr3, dfMulF(dfMul(zr, zi2), 3.0));
-                    ni = dfSub(dfMulF(dfMul(zr2, zi), 3.0), zi3);
-                } else if (u_type == 2) {
-                    nr = dfSub(r2, i2);
-                    ni = dfSub(ri, ri);
-                } else {
-                    nr = dfSub(r2, i2);
-                    ni = dfAdd(ri, ri);
-                }
-                zr = dfAdd(nr, cr);
-                zi = dfAdd(ni, ci);
-                iter += 1.0;
-            }
-            if (iter >= u_maxIter) return 0.0;
-            float hlen = sqrt(zr.h * zr.h + zi.h * zi.h);
-            return iter + 1.0 - log(log(hlen)) / log(2.0);
-        }
-
-        vec3 hsv2rgb(vec3 c) {
-            vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
-            vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-            return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-        }
-
-        void main() {
-            vec2 uv = (gl_FragCoord.xy - 0.5 * u_res) / u_res.y;
-            float raw = renderFractal(uv);            if (raw == 0.0) { fragColor = vec4(0.02, 0.02, 0.03, 1.0); return; }
-            float t = clamp(raw / u_maxIter, 0.0, 1.0);
-            vec3 col;
-            if (u_palette == 0) col = vec3(t);
-            else if (u_palette == 1) col = hsv2rgb(vec3(fract(t), 0.85, 1.0));
-            else if (u_palette == 2) col = 0.5 + 0.5 * sin(u_time * 0.25 + t * vec3(14.0, 19.0, 25.0) + vec3(0.0, 2.0, 4.0));
-            else { col = mix(vec3(0.09, 0.01, 0.01), vec3(0.98, 0.38, 0.10), pow(t, 1.15)); col = pow(col, vec3(0.92)); col *= (1.0 - 0.3 * length(uv)); }
-            fragColor = vec4(col, 1.0);
-        }`;
-
-        function createShader(gl, type, src) {
-            const s = gl.createShader(type);
-            gl.shaderSource(s, src);
-            gl.compileShader(s);
-            if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-                const log = gl.getShaderInfoLog(s);
-                showError(`Ошибка шейдера:\n${log}`);
-                return null;
-            }
-            return s;
-        }
-
-        const vsObj = createShader(gl, gl.VERTEX_SHADER, vs);
-        const fsObj = createShader(gl, gl.FRAGMENT_SHADER, fs);
-        if (!vsObj || !fsObj) throw 'Shader failed';
-
-        const prog = gl.createProgram();
-        gl.attachShader(prog, vsObj); gl.attachShader(prog, fsObj);
-        gl.linkProgram(prog);
-        gl.useProgram(prog);
-
-        const buf = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(0);
-
-        const u = {};
-        ['u_res','u_time','u_zoom','u_maxIter','u_center','u_type','u_palette'].forEach(k => u[k] = gl.getUniformLocation(prog, k));
 
         function resize() {
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            canvas.width = window.innerWidth * dpr;
-            canvas.height = window.innerHeight * dpr;
-            gl.viewport(0, 0, canvas.width, canvas.height);
+            glCanvas.width = window.innerWidth * dpr;
+            glCanvas.height = window.innerHeight * dpr;
+            attrCanvas.width = window.innerWidth * dpr;
+            attrCanvas.height = window.innerHeight * dpr;
+            attrCanvas.style.width = window.innerWidth + 'px';
+            attrCanvas.style.height = window.innerHeight + 'px';
         }
-        window.addEventListener('resize', resize); resize();
 
-        let drag = false, lastX = 0, lastY = 0, pinchDist = 0;
-        canvas.addEventListener('mousedown', e => { drag = true; lastX = e.clientX; lastY = e.clientY; });        window.addEventListener('mouseup', () => drag = false);
-        window.addEventListener('mousemove', e => {
-            if (!drag) return;
-            const dx = (e.clientX - lastX) * 0.003, dy = (e.clientY - lastY) * 0.003;
-            lastX = e.clientX; lastY = e.clientY;
-            state.cx -= dx / state.zoom; state.cy += dy / state.zoom; saveState();
-        });
-        canvas.addEventListener('wheel', e => {
-            e.preventDefault();
-            state.zoom = Math.max(0.1, Math.min(1e13, state.zoom * Math.exp(-e.deltaY * 0.002)));
-            saveState();
-        }, { passive: false });
+        function togglePanel() {
+            document.getElementById('panel').classList.toggle('open');
+        }
 
-        canvas.addEventListener('touchstart', e => {
-            if (e.touches.length === 1) { drag = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; }
-            if (e.touches.length === 2) { drag = false; const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY; pinchDist = Math.sqrt(dx*dx + dy*dy); }
-        }, { passive: true });
-        canvas.addEventListener('touchmove', e => {
-            e.preventDefault();
-            if (e.touches.length === 1 && drag) {
-                const dx = (e.touches[0].clientX - lastX) * 0.003, dy = (e.touches[0].clientY - lastY) * 0.003;
-                lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-                state.cx -= dx / state.zoom; state.cy += dy / state.zoom; saveState();
+        function toggleSound() {
+            state.soundEnabled = !state.soundEnabled;
+            const btn = document.getElementById('btnSound');
+            btn.textContent = state.soundEnabled ? '🔊' : '🔇';
+            btn.classList.toggle('muted', !state.soundEnabled);
+        }
+
+        function setMode(mode) {
+            state.mode = mode;
+            document.getElementById('modeClassic').classList.toggle('active', mode === 'classic');
+            document.getElementById('modeChaos').classList.toggle('active', mode === 'chaos');
+            updateTypeList();
+        }
+        function updateTypeList() {
+            selectType.innerHTML = '';
+            const list = state.mode === 'classic' ? FRACTALS_CLASSIC : FRACTALS_CHAOS;
+            list.forEach((f, i) => {
+                const opt = document.createElement('option');
+                opt.value = f.id;
+                opt.textContent = f.name;
+                selectType.appendChild(opt);
+            });
+            state.type = list[0].id;
+            selectType.value = state.type;
+        }
+
+        selectType.addEventListener('change', (e) => state.type = e.target.value);
+        document.getElementById('selectPalette').addEventListener('change', (e) => state.palette = parseInt(e.target.value));
+
+        function setInputMode(mode) {
+            state.inputMode = mode;
+            document.getElementById('inputDate').classList.toggle('active', mode === 'date');
+            document.getElementById('inputNum').classList.toggle('active', mode === 'num');
+            document.getElementById('inputText').classList.toggle('active', mode === 'text');
+            
+            document.getElementById('btnNow').style.display = mode === 'date' ? 'flex' : 'none';
+            document.getElementById('btnRandom').style.display = mode === 'num' ? 'flex' : 'none';
+            
+            if(mode === 'text') seedInput.placeholder = "Введите вопрос...";
+            else seedInput.placeholder = "Введите сид...";
+        }
+
+        function setDateSeed() {
+            seedInput.value = Date.now().toString();
+            state.seedValue = seedInput.value;
+        }
+
+        function setRandomSeed() {
+            const rand = Math.floor(Math.random() * 9000000000) + 1000000000;
+            seedInput.value = rand.toString();
+            state.seedValue = seedInput.value;
+        }
+
+        function updateSeedFromInput() {
+            state.seedValue = seedInput.value;
+        }
+
+        function setupInputHandlers() {
+            // Mouse events for panning
+            glCanvas.addEventListener('mousedown', (e) => {
+                if (state.mode !== 'classic') return;
+                isDragging = true;                lastMouse = [e.clientX, e.clientY];
+                glCanvas.style.cursor = 'grabbing';
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                glCanvas.style.cursor = 'move';
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging || state.mode !== 'classic') return;
+                
+                const dx = (e.clientX - lastMouse[0]);
+                const dy = (e.clientY - lastMouse[1]);
+                
+                // Convert pixel movement to fractal coordinates
+                const scale = 4.0 / (viewZoom * glCanvas.height);
+                viewCenter[0] -= dx * scale;
+                viewCenter[1] += dy * scale;
+                
+                lastMouse = [e.clientX, e.clientY];
+                
+                if (gl && prog) {
+                    renderWebGL();
+                }
+            });
+
+            // Zoom with wheel
+            glCanvas.addEventListener('wheel', (e) => {
+                if (state.mode !== 'classic') return;
+                e.preventDefault();
+                
+                const zoomFactor = Math.exp(-e.deltaY * 0.001);
+                const newZoom = viewZoom * zoomFactor;
+                
+                if (newZoom >= 0.5 && newZoom <= 1000000) {
+                    viewZoom = newZoom;
+                    if (gl && prog) {
+                        renderWebGL();
+                    }
+                }
+            }, { passive: false });
+
+            // Touch events for mobile
+            let initialPinchDist = null;
+            let initialZoom = 1;
+            let lastTouchPos = null;
+
+            glCanvas.addEventListener('touchstart', (e) => {
+                if (state.mode !== 'classic') return;                if (e.touches.length === 2) {
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    initialPinchDist = Math.sqrt(dx * dx + dy * dy);
+                    initialZoom = viewZoom;
+                } else if (e.touches.length === 1) {
+                    lastTouchPos = [e.touches[0].clientX, e.touches[0].clientY];
+                }
+            }, { passive: true });
+
+            glCanvas.addEventListener('touchmove', (e) => {
+                if (state.mode !== 'classic') return;
+                
+                if (e.touches.length === 2 && initialPinchDist) {
+                    e.preventDefault();
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const scale = dist / initialPinchDist;
+                    
+                    viewZoom = Math.max(0.5, Math.min(1000000, initialZoom * scale));
+                    if (gl && prog) renderWebGL();
+                } else if (e.touches.length === 1 && lastTouchPos) {
+                    e.preventDefault();
+                    const dx = e.touches[0].clientX - lastTouchPos[0];
+                    const dy = e.touches[0].clientY - lastTouchPos[1];
+                    
+                    const scale = 4.0 / (viewZoom * glCanvas.height);
+                    viewCenter[0] -= dx * scale;
+                    viewCenter[1] += dy * scale;
+                    
+                    lastTouchPos = [e.touches[0].clientX, e.touches[0].clientY];
+                    if (gl && prog) renderWebGL();
+                }
+            }, { passive: false });
+
+            glCanvas.addEventListener('touchend', () => {
+                lastTouchPos = null;
+                initialPinchDist = null;
+            });
+        }
+
+        function calculateSeedParams() {
+            let seedNum = parseInt(state.seedValue.replace(/\D/g, '')) || 0;
+            
+            if (state.type === 'julia') {
+                currentSeedParams.cx = ((seedNum % 10000) / 10000) * 4.0 - 2.0;
+                currentSeedParams.cy = (((Math.floor(seedNum / 10000)) % 10000) / 10000) * 4.0 - 2.0;
+            } else {
+                currentSeedParams.cx = ((seedNum % 10000) / 10000) * 3.0 - 1.5;                currentSeedParams.cy = (((Math.floor(seedNum / 10000)) % 10000) / 10000) * 3.0 - 1.5;
             }
-            if (e.touches.length === 2) {
-                const dx = e.touches[0].clientX - e.touches[1].clientX, dy = e.touches[0].clientY - e.touches[1].clientY;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                const scale = dist / pinchDist;
-                state.zoom = Math.max(0.1, Math.min(1e13, state.zoom * scale));
-                pinchDist = dist; saveState();
+        }
+
+        function generate() {
+            try {
+                errorBox.style.display = 'none';
+                
+                if (state.soundEnabled) playSound(state.seedValue);
+
+                calculateSeedParams();
+                viewZoom = 1.0;
+                
+                const seedHash = state.seedValue.split('').reduce((a, b) => {
+                    a = ((a << 5) - a) + b.charCodeAt(0);
+                    return a & a;
+                }, 0);
+                
+                viewCenter = [
+                    ((Math.abs(seedHash) % 1000) / 1000) * 2.0 - 1.0,
+                    ((Math.abs(seedHash >> 16) % 1000) / 1000) * 2.0 - 1.0
+                ];
+
+                if (state.mode === 'classic') {
+                    glCanvas.style.display = 'block';
+                    attrCanvas.style.display = 'none';
+                    initWebGL();
+                    renderWebGL();
+                } else {
+                    glCanvas.style.display = 'none';
+                    attrCanvas.style.display = 'block';
+                    renderAttractor();
+                }
+                
+                document.getElementById('panel').classList.remove('open');
+
+            } catch (e) {
+                showError(e.message);
             }
-        }, { passive: false });
-        canvas.addEventListener('touchend', () => drag = false);
+        }
 
-        function setType(v) { state.type = parseInt(v); saveState(); document.getElementById('hType').textContent = names[state.type]; }
-        function setPalette(v) { state.palette = parseInt(v); saveState(); document.getElementById('hPal').textContent = palNames[state.palette]; }
-        document.getElementById('hType').textContent = names[state.type];
-        document.getElementById('hPal').textContent = palNames[state.palette];
+        function showError(msg) {
+            errorText.textContent = msg;
+            errorBox.style.display = 'block';
+            console.error(msg);
+        }
 
-        let lastTime = performance.now(), frames = 0, fps = 0, lastFpsTime = 0;
-        function render(now) {
-            lastTime = now; frames++;
-            if (now - lastFpsTime >= 1000) { fps = frames; frames = 0; lastFpsTime = now; }
-            let targetIter = Math.max(100, Math.min(800, Math.floor(150 * Math.log2(Math.max(1, state.zoom * 0.5) + 1))));
-            if (fps < 25) targetIter = Math.max(100, targetIter * 0.8);
-            state.maxIter = targetIter;
+        function initWebGL() {
+            if (gl) return;
+            gl = glCanvas.getContext('webgl2', { antialias: false, alpha: false });
+            if (!gl) throw "WebGL2 не поддерживается";
 
-            gl.uniform2f(u.u_res, canvas.width, canvas.height);
-            gl.uniform1f(u.u_time, now * 0.001);
-            gl.uniform1f(u.u_zoom, state.zoom);            gl.uniform1f(u.u_maxIter, state.maxIter);
-            gl.uniform2f(u.u_center, state.cx, state.cy);
-            gl.uniform1i(u.u_type, state.type);
-            gl.uniform1i(u.u_palette, state.palette);
+            const vs = `#version 300 es
+            layout(location = 0) in vec2 a_pos;
+            void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
+
+            const fs = `#version 300 es
+            precision highp float;
+            uniform vec2 u_res;
+            uniform float u_zoom;
+            uniform vec2 u_center;
+            uniform float u_cx, u_cy;
+            uniform int u_type, u_palette;
+            out vec4 fragColor;
+
+            vec3 palette(float t, int p) {
+                if(p == 0) { // Радужная
+                    vec3 c = vec3(t, t, t);
+                    return abs(mod(c * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0;
+                }
+                if(p == 1) { // Чёрно-белая
+                    return vec3(t);
+                }
+                if(p == 2) { // Психоделия
+                    return 0.5 + 0.5 * sin(vec3(0.0, 0.33, 0.67) * 6.28318 + t * 20.0);
+                }
+                if(p == 3) { // Inferno
+                    return mix(vec3(0.0), mix(vec3(0.5, 0.0, 0.0), vec3(1.0, 1.0, 0.8), smoothstep(0.2, 0.8, t)), smoothstep(0.0, 0.5, t));
+                }
+                if(p == 4) { // Mystic Void
+                    return mix(vec3(0.05, 0.0, 0.1), vec3(0.2, 0.5, 1.0), sin(t * 10.0) * 0.5 + 0.5);
+                }
+                if(p == 5) { // Neon Tokyo
+                    return mix(vec3(0.1, 0.0, 0.2), mix(vec3(1.0, 0.0, 0.5), vec3(0.0, 1.0, 1.0), t), t);
+                }
+                if(p == 6) { // DNA Sequence
+                    return vec3(0.0, t * 0.8, 0.1) + vec3(t*0.2, t*0.2, 0.0);
+                }
+                if(p == 7) { // Sunset
+                    return mix(vec3(0.2, 0.0, 0.3), vec3(1.0, 0.6, 0.1), t);
+                }
+                if(p == 8) { // Doom
+                    return mix(vec3(0.1, 0.0, 0.0), vec3(1.0, 0.2, 0.0), pow(t, 0.8));
+                }
+                return vec3(1.0);
+            }
+
+            void main() {
+                vec2 uv = (gl_FragCoord.xy - 0.5 * u_res) / u_res.y;                vec2 c = uv / u_zoom + u_center;
+                vec2 z;
+                float iter = 0.0;
+                float maxIter = 100.0 + log(u_zoom + 1.0) * 20.0;
+
+                if (u_type == 0) { // Mandelbrot
+                    z = vec2(0.0);
+                } else if (u_type == 1) { // Julia
+                    z = uv / u_zoom + u_center;
+                    c = vec2(u_cx, u_cy);
+                } else { // Others
+                    z = vec2(0.0);
+                }
+
+                for (int i = 0; i < 500; i++) {
+                    if (float(i) > maxIter) break;
+                    if (dot(z, z) > 4.0) break;
+
+                    float x = z.x;
+                    float y = z.y;
+                    float x2 = x * x;
+                    float y2 = y * y;
+
+                    if (u_type == 0) { // Mandelbrot
+                        z = vec2(x2 - y2 + c.x, 2.0 * x * y + c.y);
+                    } else if (u_type == 1) { // Julia
+                        z = vec2(x2 - y2 + c.x, 2.0 * x * y + c.y);
+                    } else if (u_type == 2) { // Burning Ship
+                        z = vec2(x2 - y2 + c.x, -2.0 * abs(x) * abs(y) + c.y);
+                    } else if (u_type == 3) { // Multibrot n=3
+                        z = vec2(x * (x2 - 3.0 * y2) + c.x, y * (3.0 * x2 - y2) + c.y);
+                    } else if (u_type == 4) { // Tricorn
+                        z = vec2(x2 - y2 + c.x, -2.0 * x * y + c.y);
+                    } else if (u_type == 5) { // Celtic
+                        x = abs(x);
+                        z = vec2(x * x - y2 + c.x, 2.0 * x * y + c.y);
+                    }
+                    
+                    iter += 1.0;
+                }
+
+                if (iter > maxIter - 1.0) {
+                    fragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                } else {
+                    float sn = iter + 1.0 - log(log(dot(z, z))) / log(2.0);
+                    float t = sn / 50.0;
+                    vec3 col = palette(fract(t), u_palette);
+                    fragColor = vec4(col, 1.0);
+                }
+            }`;
+            const vsObj = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vsObj, vs);
+            gl.compileShader(vsObj);
+            
+            const fsObj = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fsObj, fs);
+            gl.compileShader(fsObj);
+
+            if (!gl.getShaderParameter(fsObj, gl.COMPILE_STATUS)) {
+                const log = gl.getShaderInfoLog(fsObj);
+                gl.deleteShader(fsObj);
+                throw "Ошибка компиляции шейдера:\n" + log;
+            }
+
+            prog = gl.createProgram();
+            gl.attachShader(prog, vsObj);
+            gl.attachShader(prog, fsObj);
+            gl.linkProgram(prog);
+            gl.useProgram(prog);
+
+            const buf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+            gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(0);
+
+            uniformLocs = {
+                res: gl.getUniformLocation(prog, 'u_res'),
+                zoom: gl.getUniformLocation(prog, 'u_zoom'),
+                center: gl.getUniformLocation(prog, 'u_center'),
+                cx: gl.getUniformLocation(prog, 'u_cx'),
+                cy: gl.getUniformLocation(prog, 'u_cy'),
+                type: gl.getUniformLocation(prog, 'u_type'),
+                palette: gl.getUniformLocation(prog, 'u_palette')
+            };
+        }
+
+        function renderWebGL() {
+            if (!gl || !prog) {
+                throw "WebGL не инициализирован";
+            }
+
+            gl.uniform2f(uniformLocs.res, glCanvas.width, glCanvas.height);
+            gl.uniform1f(uniformLocs.zoom, viewZoom);
+            gl.uniform2f(uniformLocs.center, viewCenter[0], viewCenter[1]);
+            gl.uniform1f(uniformLocs.cx, currentSeedParams.cx);
+            gl.uniform1f(uniformLocs.cy, currentSeedParams.cy);
+            gl.uniform1i(uniformLocs.type, FRACTALS_CLASSIC.findIndex(f => f.id === state.type));
+            gl.uniform1i(uniformLocs.palette, state.palette);
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-            document.getElementById('hCoord').textContent = `${state.cx.toFixed(4)}, ${state.cy.toFixed(4)}`;
-            document.getElementById('hZoom').textContent = `×${state.zoom > 10000 ? state.zoom.toExponential(2) : state.zoom.toFixed(2)}`;
-            document.getElementById('hFPS').textContent = fps;
-            document.getElementById('hIter').textContent = Math.round(state.maxIter);
-            requestAnimationFrame(render);
         }
-        requestAnimationFrame(render);
+
+        function renderAttractor() {
+            const w = attrCanvas.width;
+            const h = attrCanvas.height;
+            ctxAttr.fillStyle = '#050505';
+            ctxAttr.fillRect(0, 0, w, h);
+
+            let seedNum = parseFloat(state.seedValue.replace(/\D/g, '')) || 123456789;
+            
+            let a = Math.sin(seedNum * 0.0001) * 2.5;
+            let b = Math.cos(seedNum * 0.00013) * 2.5;
+            let c = Math.sin(seedNum * 0.00017) * 2.5;
+            let d = Math.cos(seedNum * 0.00019) * 2.5;
+
+            let x = 0.1, y = 0.1;
+            let iter = state.type === 'hopalong' ? 500000 : 2000000;
+            
+            ctxAttr.fillStyle = getAttractorColor();
+            
+            let skip = state.type === 'hopalong' ? 50 : 100;
+            for (let i = 0; i < skip; i++) {
+                let nx, ny;
+                if (state.type === 'clifford') {
+                    nx = Math.sin(a * y) + c * Math.cos(a * x);
+                    ny = Math.sin(b * x) + d * Math.cos(b * y);
+                } else if (state.type === 'dejong') {
+                    nx = Math.sin(a * y) - Math.cos(b * x);
+                    ny = Math.sin(c * x) - Math.cos(d * y);
+                } else if (state.type === 'hopalong') {
+                    let x_old = x;
+                    x = y - Math.sign(x_old) * Math.sqrt(Math.abs(b * x_old - c));
+                    y = a - x_old;
+                    continue;
+                } else { // Pickover
+                    nx = Math.sin(b * y) + c * Math.sin(b * x);
+                    ny = Math.sin(a * x) + d * Math.sin(a * y);
+                }
+                x = nx; y = ny;
+            }
+
+            for (let i = 0; i < iter; i++) {
+                let nx, ny;
+                if (state.type === 'clifford') {
+                    nx = Math.sin(a * y) + c * Math.cos(a * x);
+                    ny = Math.sin(b * x) + d * Math.cos(b * y);
+                } else if (state.type === 'dejong') {
+                    nx = Math.sin(a * y) - Math.cos(b * x);                    ny = Math.sin(c * x) - Math.cos(d * y);
+                } else if (state.type === 'hopalong') {
+                    let x_old = x;
+                    x = y - Math.sign(x_old) * Math.sqrt(Math.abs(b * x_old - c));
+                    y = a - x_old;
+                    nx = x; ny = y;
+                } else { // Pickover
+                    nx = Math.sin(b * y) + c * Math.sin(b * x);
+                    ny = Math.sin(a * x) + d * Math.sin(a * y);
+                }
+                
+                if (state.type !== 'hopalong') {
+                    x = nx; y = ny;
+                }
+
+                let scale = state.type === 'hopalong' ? 0.08 : 0.15;
+                let px = (x * scale + 0.5) * w;
+                let py = (y * scale + 0.5) * h;
+
+                if (px > 0 && px < w && py > 0 && py < h) {
+                    let size = state.type === 'hopalong' ? 2.0 : 1.5;
+                    ctxAttr.fillRect(px, py, size, size);
+                }
+            }
+        }
+
+        function getAttractorColor() {
+            const p = state.palette;
+            if(p==0) return `rgba(255,255,255, 0.1)`;
+            if(p==1) return `rgba(150,150,150, 0.1)`;
+            if(p==2) return `rgba(255, 0, 255, 0.1)`;
+            if(p==3) return `rgba(255, 100, 0, 0.1)`;
+            if(p==4) return `rgba(100, 0, 255, 0.1)`;
+            if(p==5) return `rgba(0, 255, 255, 0.1)`;
+            if(p==6) return `rgba(0, 255, 100, 0.1)`;
+            if(p==7) return `rgba(255, 150, 50, 0.1)`;
+            if(p==8) return `rgba(255, 0, 0, 0.15)`;
+            return `rgba(200, 200, 255, 0.1)`;
+        }
+
+        function playSound(seedStr) {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                let num = parseInt(seedStr) || 0;
+                let freq = 100 + (Math.abs(num) % 700);
+                
+                const osc = audioCtx.createOscillator();                const gain = audioCtx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(freq * 2, audioCtx.currentTime + 0.5);
+                
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            } catch (e) {
+                console.log("Sound error:", e);
+            }
+        }
+
+        function savePNG() {
+            let dataUrl;
+            if (state.mode === 'classic') {
+                dataUrl = glCanvas.toDataURL('image/png');
+            } else {
+                dataUrl = attrCanvas.toDataURL('image/png');
+            }
+            
+            const link = document.createElement('a');
+            link.download = `oracle_seed_${state.seedValue}.png`;
+            link.href = dataUrl;
+            link.click();
+        }
+
+        init();
     </script>
 </body>
 </html>
