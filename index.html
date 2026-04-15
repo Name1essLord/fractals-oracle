@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/864/864685.png">
 
-    <!-- Подключение стилей и скриптов -->
+    <!-- Подключение стилей -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -34,40 +34,38 @@
         </div>
         <div class="panel-content">
 
-            <!-- Уровень 1: Система -->
+            <!-- УРОВЕНЬ 1: Система -->
             <div class="nav-row">
-                <button class="nav-btn" onclick="scrollNav('system', -1)"><</button>
-                <div class="nav-scroll" id="navSystem">
-                    <div class="nav-item active" data-value="escape" onclick="selectSystem('escape')">Escape-Time</div>
-                    <div class="nav-item" data-value="chaos" onclick="selectSystem('chaos')">Chaos</div>
-                    <div class="nav-item" data-value="geometric" onclick="selectSystem('geometric')">Geometric</div>
+                <button class="nav-btn" onclick="scrollRow('system', -1)"><</button>
+                <div class="nav-scroll" id="scroll-system">
+                    <!-- Заполняется через JS -->
                 </div>
-                <button class="nav-btn" onclick="scrollNav('system', 1)">></button>
+                <button class="nav-btn" onclick="scrollRow('system', 1)">></button>
             </div>
 
-            <!-- Уровень 2: Тип -->
+            <!-- УРОВЕНЬ 2: Тип -->
             <div class="nav-row">
-                <button class="nav-btn" onclick="scrollNav('type', -1)"><</button>                <div class="nav-scroll" id="navType">
-                    <div class="nav-item active" data-value="classic" onclick="selectType('classic')">Классика</div>
-                </div>
-                <button class="nav-btn" onclick="scrollNav('type', 1)">></button>
+                <button class="nav-btn" onclick="scrollRow('type', -1)"><</button>
+                <div class="nav-scroll" id="scroll-type">
+                    <!-- Заполняется через JS -->                </div>
+                <button class="nav-btn" onclick="scrollRow('type', 1)">></button>
             </div>
 
-            <!-- Уровень 3: Фрактал -->
+            <!-- УРОВЕНЬ 3: Фрактал -->
             <div class="nav-row">
-                <button class="nav-btn" onclick="scrollNav('fractal', -1)"><</button>
-                <div class="nav-scroll" id="navFractal">
-                    <div class="nav-item active" data-value="mandelbrot" onclick="selectFractal('mandelbrot')">Mandelbrot</div>
+                <button class="nav-btn" onclick="scrollRow('fractal', -1)"><</button>
+                <div class="nav-scroll" id="scroll-fractal">
+                    <!-- Заполняется через JS -->
                 </div>
-                <button class="nav-btn" onclick="scrollNav('fractal', 1)">></button>
+                <button class="nav-btn" onclick="scrollRow('fractal', 1)">></button>
             </div>
 
-            <!-- Палитра с кнопкой рандома -->
+            <!-- ПАЛИТРА + РАНДОМ -->
             <div class="controls-row">
-                <div class="control-group">
+                <div class="control-group" style="width: 100%;">
                     <label>Палитра</label>
                     <div class="palette-wrapper">
-                        <select id="selectPalette">
+                        <select id="selectPalette" onchange="state.palette = parseInt(this.value)">
                             <option value="0">🌈 Радужная</option>
                             <option value="1">⚫ Чёрно-белая</option>
                             <option value="2">🌀 Психоделия</option>
@@ -83,7 +81,7 @@
                 </div>
             </div>
 
-            <!-- Сид -->
+            <!-- СИД -->
             <div class="control-group">
                 <label>Сид (Seed)</label>
                 <div style="display: flex; gap: 10px; margin-bottom: 5px;">
@@ -97,8 +95,8 @@
                     <button class="seed-btn" id="btnRandom" onclick="setRandomSeed()" title="Случайное число" style="display:none;">🎲</button>
                 </div>
             </div>
-            <!-- Действия -->
-            <div class="actions">
+
+            <!-- ДЕЙСТВИЯ -->            <div class="actions">
                 <button class="btn-main" onclick="generate()">🔮 ГЕНЕРИРОВАТЬ</button>
                 <button class="btn-sec" onclick="savePNG()">📸 PNG</button>
             </div>
@@ -110,16 +108,11 @@
     <script src="shaders.js"></script>
     <script src="main.js"></script>
     
-    <!-- Service Worker для PWA -->
+    <!-- Service Worker -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW failed', err));
-        });
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', e => {
-          e.preventDefault();
-          deferredPrompt = e;
         });
       }
     </script>
