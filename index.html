@@ -34,31 +34,56 @@
         </div>
         <div class="panel-content">
 
-            <div class="mode-switch">
-                <div class="mode-btn active" id="modeClassic" onclick="setMode('classic')">✨ Классика</div>
-                <div class="mode-btn" id="modeChaos" onclick="setMode('chaos')">🌪 Хаос</div>
+            <!-- Уровень 1: Система -->
+            <div class="nav-row">
+                <button class="nav-btn" onclick="scrollNav('system', -1)"><</button>
+                <div class="nav-scroll" id="navSystem">
+                    <div class="nav-item active" data-value="escape" onclick="selectSystem('escape')">Escape-Time</div>
+                    <div class="nav-item" data-value="chaos" onclick="selectSystem('chaos')">Chaos</div>
+                    <div class="nav-item" data-value="geometric" onclick="selectSystem('geometric')">Geometric</div>
+                </div>
+                <button class="nav-btn" onclick="scrollNav('system', 1)">></button>
             </div>
 
+            <!-- Уровень 2: Тип -->
+            <div class="nav-row">
+                <button class="nav-btn" onclick="scrollNav('type', -1)"><</button>                <div class="nav-scroll" id="navType">
+                    <div class="nav-item active" data-value="classic" onclick="selectType('classic')">Классика</div>
+                </div>
+                <button class="nav-btn" onclick="scrollNav('type', 1)">></button>
+            </div>
+
+            <!-- Уровень 3: Фрактал -->
+            <div class="nav-row">
+                <button class="nav-btn" onclick="scrollNav('fractal', -1)"><</button>
+                <div class="nav-scroll" id="navFractal">
+                    <div class="nav-item active" data-value="mandelbrot" onclick="selectFractal('mandelbrot')">Mandelbrot</div>
+                </div>
+                <button class="nav-btn" onclick="scrollNav('fractal', 1)">></button>
+            </div>
+
+            <!-- Палитра с кнопкой рандома -->
             <div class="controls-row">
                 <div class="control-group">
-                    <label>Фрактал</label>
-                    <select id="selectType"></select>
-                </div>
-                <div class="control-group">
                     <label>Палитра</label>
-                    <select id="selectPalette">
-                        <option value="0">🌈 Радужная</option>                        <option value="1">⚫ Чёрно-белая</option>
-                        <option value="2">🔆 Психоделия</option>
-                        <option value="3">🔥 Инферно</option>
-                        <option value="4">❔ Пустота</option>
-                        <option value="5">🌃 Neon Tokyo</option>
-                        <option value="6">🧬 ДНК</option>
-                        <option value="7">🌅 Восход</option>
-                        <option value="8">🚫 Doom</option>
-                    </select>
+                    <div class="palette-wrapper">
+                        <select id="selectPalette">
+                            <option value="0">🌈 Радужная</option>
+                            <option value="1">⚫ Чёрно-белая</option>
+                            <option value="2">🌀 Психоделия</option>
+                            <option value="3">🔥 Инферно</option>
+                            <option value="4">❔ Пустота</option>
+                            <option value="5">🌃 Neon Tokyo</option>
+                            <option value="6">🧬 ДНК</option>
+                            <option value="7">🌅 Восход</option>
+                            <option value="8">🚫 Doom</option>
+                        </select>
+                        <button class="btn-random-palette" onclick="generateRandomPalette()" title="Случайная палитра">🎲</button>
+                    </div>
                 </div>
             </div>
 
+            <!-- Сид -->
             <div class="control-group">
                 <label>Сид (Seed)</label>
                 <div style="display: flex; gap: 10px; margin-bottom: 5px;">
@@ -72,7 +97,7 @@
                     <button class="seed-btn" id="btnRandom" onclick="setRandomSeed()" title="Случайное число" style="display:none;">🎲</button>
                 </div>
             </div>
-
+            <!-- Действия -->
             <div class="actions">
                 <button class="btn-main" onclick="generate()">🔮 ГЕНЕРИРОВАТЬ</button>
                 <button class="btn-sec" onclick="savePNG()">📸 PNG</button>
@@ -81,7 +106,7 @@
         </div>
     </div>
 
-    <!-- Подключение скриптов (порядок важен!) -->
+    <!-- Подключение скриптов -->
     <script src="shaders.js"></script>
     <script src="main.js"></script>
     
@@ -96,6 +121,7 @@
           e.preventDefault();
           deferredPrompt = e;
         });
-      }    </script>
+      }
+    </script>
 </body>
 </html>
